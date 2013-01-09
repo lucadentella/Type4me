@@ -12,11 +12,14 @@ char mystring[RX_BUFFER_SIZE];
 
 int8 mystring_length;
 int1 notify_enumeration;
+int1 send_enter;
 
 void main() {
-   
+    
    output_low(LED);
    notify_enumeration = TRUE;
+   send_enter = FALSE;
+   disable_interrupts(GLOBAL);
       
    rx_position = 0;
    get_password_from_eeprom();   
@@ -40,9 +43,12 @@ void main() {
             output_low(LED);
             notify_enumeration = FALSE;
          }
-         
+                 
          // button pressed? type string using USB keyboard
-         if(check_button()) printf(send_char, mystring);
+         if(check_button()) {
+            printf(send_char, mystring);
+            if(send_enter) send_char('\r');
+         }
          
          // new char from USB serial port?
          if(usb_cdc_kbhit()) {
@@ -51,8 +57,8 @@ void main() {
             delay_ms(10);            
             char incoming_char = usb_cdc_getc();
             
-            // new line?
-            if(incoming_char == '\n') {
+            // carriage return
+            if(incoming_char == 0x0D) {
             
                // end string
                rx_buffer[rx_position] = '\0';
@@ -61,6 +67,7 @@ void main() {
                if(strcmp(rx_buffer, "!CLEAR!") == 0) {
                   mystring[0] = '\0';
                   store_string_to_eeprom();
+                  send_enter = FALSE;
                   printf(usb_cdc_putc, "\r\nCLEARED!\r\n");
                }
                
@@ -68,6 +75,18 @@ void main() {
                else if(strcmp(rx_buffer, "!SAVE!") == 0) {
                   store_string_to_eeprom();
                   printf(usb_cdc_putc, "\r\nSAVED!\r\n");
+               }
+               
+               // send enter command
+               else if(strcmp(rx_buffer, "!ENTER!") == 0) {
+                  send_enter = TRUE;
+                  printf(usb_cdc_putc, "\r\nSENDING ENTER!\r\n");
+               }
+               
+               // don't send enter command
+               else if(strcmp(rx_buffer, "!NOENTER!") == 0) {
+                  send_enter = FALSE;
+                  printf(usb_cdc_putc, "\r\nNOT SENDING ENTER!\r\n");
                }
                
                // normal string, save rx buffer content and ack
@@ -81,8 +100,18 @@ void main() {
                rx_position = 0;
             }
             
+            // line feed? ignore..
+            else if(incoming_char == 0x0A) {}
+            
+            // del?
+            else if(incoming_char == 0x7F) {
+               
+               if(rx_position > 0) rx_position--;
+               usb_cdc_putc(incoming_char);
+            }
+            
             // "normal" char?
-            else if(incoming_char != '\r') {
+            else {
             
                // save it in rx buffer and echo to user
                rx_buffer[rx_position] = incoming_char;
