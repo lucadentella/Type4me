@@ -1,0 +1,9 @@
+Type4Me
+
+USB keyboard emulator based on PIC18f14k50.
+It allows to automatically type repetitive words (passwords...)
+Includes a C# GUI.
+
+
+Project description on my blog:
+http://www.lucadentella.it/category/type4me/
